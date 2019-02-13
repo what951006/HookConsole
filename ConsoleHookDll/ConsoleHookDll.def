@@ -6,3 +6,4 @@ EXPORTS
 	ReleaseConsoleBuffer
 	StartTargetApp
 	ProcessMessage
+	Input

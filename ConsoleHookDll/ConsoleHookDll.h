@@ -44,6 +44,9 @@ void ReleaseConsoleBuffer(ConsoleBuffer *buf);
 BOOL StartTargetApp(char *commandline, PROCESS_INFORMATION *ppi, HWND hClient);
 BOOL ProcessMessage(WPARAM wParam, LPARAM lParam);
 BOOL WaitEvent(BOOL *timedout);
+
+BOOL Input(const char*data,int len);
+
 #ifdef __cplusplus
 }
 #endif

@@ -3,6 +3,10 @@
 #include "Packet.h"
 #include "Utils.h"
 #include "detours.h"
+#include <namedpipeapi.h>
+
+#define  CONSOLE_APP_TITLE "TEST_CONSOLE"
+
 
 enum LibraryMode enumLibraryMode = LM_CLIENT;
 enum TransmissionMode enumTransMode = TM_WM_COPYDATA;
@@ -143,17 +147,20 @@ void ReleaseConsoleBuffer(ConsoleBuffer *buf)
 
 BOOL StartTargetApp(char *commandline, PROCESS_INFORMATION *ppi, HWND hClient)
 {
-    // Prepare structures
+	// Prepare structures
     STARTUPINFO si = { 0 };
+	GetStartupInfo(&si);
     PROCESS_INFORMATION pi;
     char dllPath[MAX_PATH];
     char clientHandle[16];
     char *environmentStrings;
     BOOL success;
-
-	si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
+	ZeroMemory(&si, sizeof(STARTUPINFO));
+	si.cb = sizeof(STARTUPINFO);
+    si.dwFlags =  STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_SHOWNORMAL;
+	si.lpTitle = CONSOLE_APP_TITLE;
+	
 
     // Prepare DLL path
     GetFilePathInCurrentDir(dllPath, MAX_PATH, "ConsoleHookDll.dll");
@@ -170,13 +177,16 @@ BOOL StartTargetApp(char *commandline, PROCESS_INFORMATION *ppi, HWND hClient)
     if (ppi != NULL)
     {
         *ppi = pi;
+		//FindWindow(NULL,"");
+		//g_console_ = pi.hProcess;
+		
     }
     return success;
 }
 
 BOOL ParsePacket(const char *pkt)
 {
-    int code = -1;
+    int code = -1; 
     ParseOpCode(pkt, &code);
 
     if (code == OP_ALLOC_CONSOLE)
@@ -209,6 +219,63 @@ BOOL ProcessMessage(WPARAM wParam, LPARAM lParam)
     COPYDATASTRUCT *cds = (COPYDATASTRUCT *)lParam;
     // DumpCopyData(cds);
     return ParsePacket(cds->lpData);
+}
+
+HWND GetConsoleHwnd(void)
+{
+#define MY_BUFSIZE 1024 // Buffer size for console window titles.
+	HWND hwndFound;         // This is what is returned to the caller.
+	char pszNewWindowTitle[MY_BUFSIZE]; // Contains fabricated
+										// WindowTitle.
+	char pszOldWindowTitle[MY_BUFSIZE]; // Contains original
+										// WindowTitle.
+
+										// Fetch current window title.
+
+	GetConsoleTitle(pszOldWindowTitle, MY_BUFSIZE);
+
+	// Format a "unique" NewWindowTitle.
+
+	wsprintf(pszNewWindowTitle, "%d/%d",
+		GetTickCount(),
+		GetCurrentProcessId());
+
+	// Change current window title.
+
+	SetConsoleTitle(pszNewWindowTitle);
+
+	// Ensure window title has been updated.
+
+	Sleep(40);
+
+	// Look for NewWindowTitle.
+
+	hwndFound = FindWindow(NULL, pszNewWindowTitle);
+
+	// Restore original window title.
+
+	SetConsoleTitle(pszOldWindowTitle);
+
+	return(hwndFound);
+}
+
+BOOL Input(const char*data,int len)
+{
+	HWND cmd = FindWindow("ConsoleWindowClass", CONSOLE_APP_TITLE);
+	SetFocus(cmd);
+	ShowWindow(cmd, SW_SHOWNORMAL);
+
+	for (int i = 0; i < len; ++i)
+	{
+		SendMessage(cmd, WM_CHAR, (WPARAM)data[i], 0);
+		Sleep(40);
+	}
+	
+	PostMessage(cmd,WM_KEYDOWN,(WPARAM)VK_RETURN,0);
+	SendMessage(cmd, WM_KEYUP, (WPARAM)VK_RETURN, 0);
+
+	return TRUE;
+	
 }
 
 // The Dll Main Entry /////////////////////////////////////////////////////////////////////////////
